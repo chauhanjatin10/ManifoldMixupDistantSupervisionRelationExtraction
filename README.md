@@ -7,5 +7,7 @@ Drive link for data - https://drive.google.com/drive/u/0/folders/1tM_3T7SQWDc3h4
 Download the main_data_splits folder and keep it along with the repo directory to avoid dataset commits the form - 
 
 -ManifoldMixupDistantSupervisionRelationExtraction
+
 -data
+
     -main_data_splits
