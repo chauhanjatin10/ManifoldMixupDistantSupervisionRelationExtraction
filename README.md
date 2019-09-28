@@ -8,4 +8,4 @@ Download the main_data_splits folder and keep it along with the repo directory t
 
 -ManifoldMixupDistantSupervisionRelationExtraction<br>
 -data<br>
-    -main_data_splits
+    &nbsp -main_data_splits
