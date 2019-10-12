@@ -1,18 +1,21 @@
 import os
 import glob
+import torch
 import argparse
 import torch.nn as nn
 import numpy as np
-import torch
+import os.path as osp
 
-SAVE_DIR = '/DATA1/puneet/data-mining'
+
+SAVE_DIR = osp.join(osp.dirname(osp.dirname(os.getcwd())), 'data-mining')
+
 def parse_args():
     parser = argparse.ArgumentParser(description= 'ATCNN')
     parser.add_argument("--dataset", default="nyt", type=str,
                         help="dataset")
     parser.add_argument("--config_name", default='bert-base-uncased', type=str,
                         help="Pretrained config name or path if not the same as model_name")
-    parser.add_argument("--split", default="train", type=str,
+    parser.add_argument("--split", default="train", type=str, choices=['train', 'test', 'example'],
                         help="Pretrained config name or path if not the same as model_name")
     parser.add_argument("--tokenizer_name", default='bert-base-uncased', type=str,
                         help="Pretrained tokenizer name or path if not the same as model_name")
@@ -48,6 +51,7 @@ def parse_args():
                         help="Save checkpoint every X updates steps.")
     parser.add_argument('--iter', type=int, default=-1,
                         help="Save checkpoint every X updates steps.")
+    parser.add_argument('--cuda', type=int, help='gpu number')
 
     
     return parser.parse_args()
@@ -86,7 +90,7 @@ def get_assigned_file(checkpoint_dir,num):
     assign_file = os.path.join(checkpoint_dir, '{:d}.tar'.format(num))
     return assign_file
 
-def mixup_data(x, y, alpha=1.0):
+def mixup_data(x, y, alpha=1.0, num_cuda=0):
     '''Returns mixed inputs, pairs of targets, and lambda'''
     if alpha > 0:
         lam = np.random.beta(alpha, alpha)
@@ -94,7 +98,7 @@ def mixup_data(x, y, alpha=1.0):
         lam = 1
 
     batch_size = x.size()[0]
-    index = torch.randperm(batch_size).cuda()
+    index = torch.randperm(batch_size).cuda(num_cuda)
 
     mixed_x = lam * x + (1 - lam) * x[index, :]
     y_a, y_b = y, y[index]

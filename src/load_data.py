@@ -8,7 +8,7 @@ class NYT(Dataset):
     def __init__(self, root, tokenizer, split='example',max_length=128):
         self.root = os.path.expanduser(root)
         self.split = split
-        self.split_json = os.path.join(root, self.split+'.json')
+        self.split_json = os.path.join(root, self.split + '.json')
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.pad_token = self.tokenizer.convert_tokens_to_ids([self.tokenizer.pad_token])[0]
@@ -17,7 +17,7 @@ class NYT(Dataset):
         with open(self.split_json, 'rb') as f:
             self.nyt_dataset = json.load(f)
             # print(self.nyt_dataset)
-        with open(os.path.join(root, 'labels.json'), 'rb') as f:
+        with open(os.path.join(root, 'relation2id.json'), 'rb') as f:
             self.labels = json.load(f)
 
     def __len__(self):
@@ -32,6 +32,8 @@ class NYT(Dataset):
         attention_mask = attention_mask + ([0] * padding_length)
         sentence = torch.tensor(sentence)
         attention_mask = torch.tensor(attention_mask)
-        relation = self.labels[data['relation']]
-
-        return sentence,attention_mask, relation
+        try:
+            relation = self.labels[data['relation']]
+        except KeyError:
+            return self.__getitem__((index + 1) % self.__len__())
+        return sentence, attention_mask, relation
