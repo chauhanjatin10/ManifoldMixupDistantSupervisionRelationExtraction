@@ -151,6 +151,8 @@ if __name__ == '__main__':
             start_epoch = tmp['epoch']+1
             classifier.load_state_dict(tmp['classifier'])
             model.load_state_dict(tmp['feature'])
+        else:
+            raise Exception('Resume file not found')
 
     if args.do_train:
         train(data_loader, model, classifier, args)
