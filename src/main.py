@@ -56,7 +56,7 @@ def train(train_dataloader, model,classifier, args):
             if i % 50 == 0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:3f} | Accuracy {:3f}'.format(epoch, i, len(train_dataloader), avg_loss/(i+1), (100.*correct)/total))
 
-        if (epoch % args.save_freq==0) or (epoch==args.num_train_epochs-1):
+        if (epoch % args.save_freq == 0) or (epoch == args.num_train_epochs - 1):
             outfile = os.path.join(args.checkpoint_dir, '{:d}.tar'.format(epoch))
             state_dict = {}
             state_dict['epoch'] = epoch
@@ -68,19 +68,7 @@ def test(train_dataloader, model, classifier, args):
 
     # Prepare optimizer and schedule (linear warmup and decay)
     criterion = torch.nn.CrossEntropyLoss()
-    # no_decay = ['bias', 'LayerNorm.weight']
-    # optimizer_grouped_parameters = [
-    #     {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-    #     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
-    #     {'params': [p for n, p in classifier.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': args.weight_decay},
-    #     {'params': [p for n, p in classifier.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    #     ]
 
-    # optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    # t_total = len(train_dataloader) // args.num_train_epochs
-    # scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.warmup_steps, t_total=t_total)
-    
-    # for epoch in range(args.start_epoch,args.num_train_epochs):
     correct, total = 0, 0
     avg_loss = 0.
     with torch.no_grad():
@@ -94,20 +82,8 @@ def test(train_dataloader, model, classifier, args):
             correct += (pred == relation).sum().item()
             total += pred.size(0)
 
-            # if args.mixup:
-            #     feature, relation_a, relation_b, lam = mixup_data(feature, relation, args.alpha, num_cuda=args.cuda)
-            #     logit = classifier(feature)
-            #     loss = mixup_criterion(criterion, logit, relation_a, relation_b, lam)
-            # else:
             loss = criterion(logit,relation)
-
-            # optimizer.zero_grad()
-            # loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-            # optimizer.step()
-
             avg_loss += loss.data.item()
-            # scheduler.step()
 
     print('Avg. loss: {}'.format(avg_loss / (i + 1)))
     print('Accuracy: {}%'.format((100.0 * correct) / total))
@@ -130,7 +106,7 @@ if __name__ == '__main__':
 
     model.cuda(args.cuda)
     classifier.cuda(args.cuda)
-    args.checkpoint_dir = '%s/%s/%s_%s' %(SAVE_DIR, args.dataset, args.config_name, args.split)
+    args.checkpoint_dir = '%s/%s/%s_train' %(SAVE_DIR, args.dataset, args.config_name)
     if args.mixup:
         args.checkpoint_dir += 'mixup_%.2f'%(args.alpha)
 
