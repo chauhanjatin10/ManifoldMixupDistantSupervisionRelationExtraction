@@ -177,3 +177,4 @@ if __name__ == '__main__':
         train(data_loader, model, classifier, args)
     elif args.do_eval:
         test(data_loader, model, classifier, args)
+        precision_recall(data_loader, model, classifier, args)
