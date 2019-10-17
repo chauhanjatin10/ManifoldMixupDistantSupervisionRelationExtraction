@@ -65,46 +65,33 @@ def train(train_dataloader, model,classifier, args):
             state_dict['classifier'] =  classifier.state_dict()
             torch.save(state_dict, outfile)
 
-def precision_recall(train_dataloader, model, classifier, args):
+def precision_recall(pred, relation):
 
-    # Prepare optimizer and schedule (linear warmup and decay)
-    criterion = torch.nn.CrossEntropyLoss()
+    # calculate true-positive, false-positive and false-negative count for each
     tp, fp, fn = defaultdict(lambda: 0), defaultdict(lambda: 0), defaultdict(lambda: 0)
-    with torch.no_grad():
-        for i, (sentence, attention_mask, relation) in enumerate(train_dataloader):
-            model.eval()
-            sentence, attention_mask, relation = sentence.cuda(args.cuda), attention_mask.cuda(args.cuda), relation.cuda(args.cuda)
-            feature  = model(input_ids=sentence, attention_mask=attention_mask)[0]
-            logit = classifier(feature)
-
-            pred =  torch.argmax(logit, 1)
-
-            # pred is prediction, relation is true value
-            for corr_i, pred_i in zip(relation, pred):
-                if(corr_i == pred_i):
-                    tp[corr_i.item()] += 1
-                else:
-                    fp[pred_i.item()] += 1
-                    fn[corr_i.item()] += 1
+    for corr_i, pred_i in zip(relation, pred):
+        if(corr_i == pred_i):
+            tp[corr_i.item()] += 1
+        else:
+            fp[pred_i.item()] += 1
+            fn[corr_i.item()] += 1
 
     mean_precision, mean_recall = 0, 0
     precision, recall = {}, {}
+    
     for corr_i in tp:
         if(corr_i not in fp):
             fp[corr_i] = 0
         if(corr_i not in fn):
             fn[corr_i] = 0
+        precision[corr_i] = tp[corr_i] / (tp[corr_i] + fp[corr_i])
+        mean_precision += precision[corr_i]
+        recall[corr_i] = tp[corr_i] / (tp[corr_i] + fn[corr_i])
+        mean_recall += recall[corr_i]
 
-        if(tp[corr_i] + fp[corr_i] != 0):
-            precision[corr_i] = tp[corr_i] / (tp[corr_i] + fp[corr_i])
-            mean_precision += precision[corr_i]
-        if(tp[corr_i] + fn[corr_i] != 0):
-            recall[corr_i] = tp[corr_i] / (tp[corr_i] + fn[corr_i])
-            mean_recall += recall[corr_i]
     mean_precision = mean_precision/len(tp)
     mean_recall = mean_recall/len(tp)
-    print('Precision: {}'.format(mean_precision))
-    print('Recall: {}'.format(mean_recall))
+    return mean_precision, mean_recall
 
 
 def test(train_dataloader, model, classifier, args):
@@ -177,4 +164,3 @@ if __name__ == '__main__':
         train(data_loader, model, classifier, args)
     elif args.do_eval:
         test(data_loader, model, classifier, args)
-        precision_recall(data_loader, model, classifier, args)
