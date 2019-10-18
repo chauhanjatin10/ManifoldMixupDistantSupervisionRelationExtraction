@@ -115,11 +115,16 @@ def test(train_dataloader, model, classifier, args):
             correct += (pred == relation).sum().item()
             total += pred.size(0)
 
+            precision_recall(pred, correct)
+
             loss = criterion(logit,relation)
             avg_loss += loss.data.item()
 
     print('Avg. loss: {}'.format(avg_loss / (i + 1)))
     print('Accuracy: {}%'.format((100.0 * correct) / total))
+    prec, recall = mean_precision_recall()
+    print('Mean Precision: {}'.format(prec))
+    print('Mean Recall: {}'.format(recall))
 
 
 if __name__ == '__main__':
