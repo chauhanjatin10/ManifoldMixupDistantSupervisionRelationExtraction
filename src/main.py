@@ -65,32 +65,35 @@ def train(train_dataloader, model,classifier, args):
             state_dict['classifier'] =  classifier.state_dict()
             torch.save(state_dict, outfile)
 
-def precision_recall(pred, relation):
 
-    # calculate true-positive, false-positive and false-negative count for each
-    tp, fp, fn = defaultdict(lambda: 0), defaultdict(lambda: 0), defaultdict(lambda: 0)
+tp, fp, fn = defaultdict(lambda: 0), defaultdict(lambda: 0), defaultdict(lambda: 0)
+keys = set(); # to manage list of keys - If this could be provided separately, remove this.
+
+# Call this for every tensor
+def precision_recall(pred, relation):
     for corr_i, pred_i in zip(relation, pred):
         if(corr_i == pred_i):
             tp[corr_i.item()] += 1
         else:
             fp[pred_i.item()] += 1
             fn[corr_i.item()] += 1
+        keys.add(corr_i.item())
+        keys.add(pred_i.item())
 
+
+# call this at the end
+def mean_precision_recall():
     mean_precision, mean_recall = 0, 0
-    precision, recall = {}, {}
-    
-    for corr_i in tp:
-        if(corr_i not in fp):
-            fp[corr_i] = 0
-        if(corr_i not in fn):
-            fn[corr_i] = 0
-        precision[corr_i] = tp[corr_i] / (tp[corr_i] + fp[corr_i])
-        mean_precision += precision[corr_i]
-        recall[corr_i] = tp[corr_i] / (tp[corr_i] + fn[corr_i])
-        mean_recall += recall[corr_i]
-
-    mean_precision = mean_precision/len(tp)
-    mean_recall = mean_recall/len(tp)
+    p, r = 0, 0
+    for key in keys:
+        if(tp[key] + fp[key] is not 0):
+            mean_precision += tp[key] / (tp[key] + fp[key]) # Adding precision[key]
+            p += 1
+        if(tp[key] + fn[key] is not 0):
+            mean_recall += tp[key] / (tp[key] + fn[key]) # Adding recall[key]
+            r += 1
+    mean_precision = mean_precision/p
+    mean_recall = mean_recall/r
     return mean_precision, mean_recall
 
 
