@@ -115,7 +115,7 @@ def test(train_dataloader, model, classifier, args):
             correct += (pred == relation).sum().item()
             total += pred.size(0)
 
-            precision_recall(pred, correct)
+            precision_recall(pred, relation)
 
             loss = criterion(logit,relation)
             avg_loss += loss.data.item()
