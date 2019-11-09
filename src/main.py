@@ -7,8 +7,11 @@ from torch.utils.data import (DataLoader, RandomSampler, SequentialSampler,
                               TensorDataset)
 from transformers import (WEIGHTS_NAME, BertConfig, BertTokenizer, BertModel)
 from transformers import AdamW, WarmupLinearSchedule
+
 from io_utils import *
 from collections import defaultdict
+import pickle
+
 
 def train(train_dataloader, model,classifier, args):
 
@@ -32,6 +35,10 @@ def train(train_dataloader, model,classifier, args):
         for i, (sentence, attention_mask, relation) in enumerate(train_dataloader):
             model.train()
             sentence, attention_mask, relation = sentence.cuda(args.cuda), attention_mask.cuda(args.cuda), relation.cuda(args.cuda)
+            lam = None
+            if args.mix_inp:
+                sentence, _, _, lam = mixup_data(sentence, relation, args.alpha, num_cuda=args.cuda, lam=lam)
+                attention_mask, _, _, lam = mixup_data(attention_mask, relation, args.alpha, num_cuda=args.cuda, lam=lam)
             feature  = model(input_ids=sentence, attention_mask=attention_mask)[0]
             logit = classifier(feature)
 
@@ -40,7 +47,7 @@ def train(train_dataloader, model,classifier, args):
             total += pred.size(0)
 
             if args.mixup:
-                feature, relation_a, relation_b, lam = mixup_data(feature, relation, args.alpha, num_cuda=args.cuda)
+                feature, relation_a, relation_b, lam = mixup_data(feature, relation, args.alpha, num_cuda=args.cuda, lam=lam)
                 logit = classifier(feature)
                 loss = mixup_criterion(criterion, logit, relation_a, relation_b, lam)
             else:
@@ -72,24 +79,24 @@ keys = set(); # to manage list of keys - If this could be provided separately, r
 # Call this for every tensor
 def precision_recall(pred, relation):
     for corr_i, pred_i in zip(relation, pred):
-        if(corr_i == pred_i):
+        if(corr_i in pred_i):
             tp[corr_i.item()] += 1
         else:
             fp[pred_i.item()] += 1
             fn[corr_i.item()] += 1
         keys.add(corr_i.item())
-        keys.add(pred_i.item())
-
+        for a in pred_i:
+            keys.add(a.item())
 
 # call this at the end
 def mean_precision_recall():
     mean_precision, mean_recall = 0, 0
     p, r = 0, 0
     for key in keys:
-        if(tp[key] + fp[key] is not 0):
+        if(tp[key] + fp[key] != 0):
             mean_precision += tp[key] / (tp[key] + fp[key]) # Adding precision[key]
             p += 1
-        if(tp[key] + fn[key] is not 0):
+        if(tp[key] + fn[key] != 0):
             mean_recall += tp[key] / (tp[key] + fn[key]) # Adding recall[key]
             r += 1
     mean_precision = mean_precision/p
@@ -102,6 +109,8 @@ def test(train_dataloader, model, classifier, args):
     # Prepare optimizer and schedule (linear warmup and decay)
     criterion = torch.nn.CrossEntropyLoss()
 
+    k = 3
+
     correct, total = 0, 0
     avg_loss = 0.
     with torch.no_grad():
@@ -111,15 +120,22 @@ def test(train_dataloader, model, classifier, args):
             feature  = model(input_ids=sentence, attention_mask=attention_mask)[0]
             logit = classifier(feature)
 
-            pred =  torch.argmax(logit, 1)
-            correct += (pred == relation).sum().item()
+            # pred =  torch.argmax(logit, 1)
+            # correct += (pred == relation).sum().item()
+            pred = torch.topk(logit, k, 1).values
+            correct += (relation[i] in pred[i] for i in range(0, len(0, len(relation)))).sum().item()
             total += pred.size(0)
 
-            precision_recall(pred, correct)
+            precision_recall(pred, relation)
 
             loss = criterion(logit,relation)
             avg_loss += loss.data.item()
 
+    outfile = os.path.join(args.checkpoint_dir, 'confusion_{}.tar'.format(args.split))
+    torch.save({'tp': dict(tp), 'fp': dict(fp), 'fn': dict(fn)}, outfile)
+    with open(osp.join(args.checkpoint_dir, 'keys_{}.pkl'.format(args.split)), 'wb+') as f:
+        pickle.dump(keys, f)
+    print('k={}'.format(k))
     print('Avg. loss: {}'.format(avg_loss / (i + 1)))
     print('Accuracy: {}%'.format((100.0 * correct) / total))
     prec, recall = mean_precision_recall()
@@ -139,7 +155,7 @@ if __name__ == '__main__':
         num_labels = 53
 
     config = BertConfig.from_pretrained(args.config_name if args.config_name else args.model_name_or_path, num_labels=num_labels, finetuning_task="data-mining")
-    classifier =  BertClassifier(config)
+    classifier =  BertClassifier(config, cos=args.cos)
     model = BertModel.from_pretrained(args.model_name_or_path, config=config)
 
     model.cuda(args.cuda)

@@ -1,0 +1,7 @@
+Data file :  /home/cs17btech11044/data_mining/data-mining/data/main_data_splits/test.json
+checkpoints dir :  /home/cs17btech11044/data_mining/data-mining/nyt/bert-base-uncased_train
+Resume file is:  /home/cs17btech11044/data_mining/data-mining/nyt/bert-base-uncased_train/9.tar
+Avg. loss: 2.9605295203395725
+Accuracy: 62.11069872518961%
+Mean Precision: 0.6672019379516684
+Mean Recall: 0.22072957675273294
