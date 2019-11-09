@@ -72,13 +72,14 @@ keys = set(); # to manage list of keys - If this could be provided separately, r
 # Call this for every tensor
 def precision_recall(pred, relation):
     for corr_i, pred_i in zip(relation, pred):
-        if(corr_i == pred_i):
+        if(corr_i in pred_i):
             tp[corr_i.item()] += 1
         else:
             fp[pred_i.item()] += 1
             fn[corr_i.item()] += 1
         keys.add(corr_i.item())
-        keys.add(pred_i.item())
+        for a in pred_i:
+            keys.add(a.item())
 
 
 # call this at the end
@@ -101,7 +102,7 @@ def test(train_dataloader, model, classifier, args):
 
     # Prepare optimizer and schedule (linear warmup and decay)
     criterion = torch.nn.CrossEntropyLoss()
-
+    k=3
     correct, total = 0, 0
     avg_loss = 0.
     with torch.no_grad():
@@ -111,8 +112,8 @@ def test(train_dataloader, model, classifier, args):
             feature  = model(input_ids=sentence, attention_mask=attention_mask)[0]
             logit = classifier(feature)
 
-            pred =  torch.argmax(logit, 1)
-            correct += (pred == relation).sum().item()
+            pred =  torch.topk(logit, k, 1).values
+            correct += ([relation[i] in pred[i] for i in range(0, len(relation))]).sum().item()
             total += pred.size(0)
 
             precision_recall(pred, relation)
@@ -120,6 +121,7 @@ def test(train_dataloader, model, classifier, args):
             loss = criterion(logit,relation)
             avg_loss += loss.data.item()
 
+    print("k={}".format(k))
     print('Avg. loss: {}'.format(avg_loss / (i + 1)))
     print('Accuracy: {}%'.format((100.0 * correct) / total))
     prec, recall = mean_precision_recall()
