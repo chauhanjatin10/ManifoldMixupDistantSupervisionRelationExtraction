@@ -11,7 +11,9 @@ from transformers import AdamW, WarmupLinearSchedule
 from io_utils import *
 from collections import defaultdict
 import pickle
-
+from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import roc_auc_score
+from collections import Counter
 
 def train(train_dataloader, model,classifier, args):
 
@@ -78,7 +80,7 @@ keys = set(); # to manage list of keys - If this could be provided separately, r
 
 # Call this for every tensor
 def precision_recall(pred, relation):
-    for corr_i, pred_i in zip(relation, pred):
+    for corr_i, pred_i in zip(relation.float(), pred):
         if(corr_i in pred_i):
             tp[corr_i.item()] += 1
         else:
@@ -108,11 +110,12 @@ def test(train_dataloader, model, classifier, args):
 
     # Prepare optimizer and schedule (linear warmup and decay)
     criterion = torch.nn.CrossEntropyLoss()
-
-    k = 3
-
+    
+    k = args.k
     correct, total = 0, 0
     avg_loss = 0.
+    pred_all = torch.tensor([], device=args.cuda, dtype=torch.long)
+    relation_all = torch.tensor([], device=args.cuda, dtype=torch.long)
     with torch.no_grad():
         for i, (sentence, attention_mask, relation) in enumerate(train_dataloader):
             model.eval()
@@ -120,16 +123,21 @@ def test(train_dataloader, model, classifier, args):
             feature  = model(input_ids=sentence, attention_mask=attention_mask)[0]
             logit = classifier(feature)
 
-            # pred =  torch.argmax(logit, 1)
-            # correct += (pred == relation).sum().item()
-            pred = torch.topk(logit, k, 1).values
-            correct += (relation[i] in pred[i] for i in range(0, len(0, len(relation)))).sum().item()
+            pred =  torch.argmax(logit, 1)
+            pred_all = torch.cat([pred_all, pred])
+            relation_all = torch.cat([relation_all, relation])
+            correct += (pred == relation).sum().item()
             total += pred.size(0)
-
-            precision_recall(pred, relation)
 
             loss = criterion(logit,relation)
             avg_loss += loss.data.item()
+
+    rel_cpu = relation_all.cpu()
+    pred_cpu = pred_all.cpu()
+    print('TRUE COUNT:', Counter(rel_cpu.numpy()))
+    print('PREDICTED COUNT:', Counter(pred_cpu.numpy()))
+
+    prec, recall, fbeta_score, support = precision_recall_fscore_support(rel_cpu, pred_cpu, average=None, labels=[i for i in range(15)])
 
     outfile = os.path.join(args.checkpoint_dir, 'confusion_{}.tar'.format(args.split))
     torch.save({'tp': dict(tp), 'fp': dict(fp), 'fn': dict(fn)}, outfile)
@@ -138,7 +146,7 @@ def test(train_dataloader, model, classifier, args):
     print('k={}'.format(k))
     print('Avg. loss: {}'.format(avg_loss / (i + 1)))
     print('Accuracy: {}%'.format((100.0 * correct) / total))
-    prec, recall = mean_precision_recall()
+
     print('Mean Precision: {}'.format(prec))
     print('Mean Recall: {}'.format(recall))
 
@@ -147,22 +155,40 @@ if __name__ == '__main__':
     
     args = parse_args()
     
+    # create tokenizer
     tokenizer = BertTokenizer.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path, do_lower_case=True)
     
+    # get data loader
     if args.dataset == 'nyt':
         dataset = NYT(root=osp.join(osp.dirname(osp.dirname(os.getcwd())), 'data-mining/data/main_data_splits'), split=args.split, tokenizer=tokenizer)
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=2)
-        num_labels = 53
+        num_labels = 15
+    else:
+        raise Exception("Unknown dataset: {}".format(args.dataset))
 
+    # get bert config
     config = BertConfig.from_pretrained(args.config_name if args.config_name else args.model_name_or_path, num_labels=num_labels, finetuning_task="data-mining")
+    print('bert configs:')
+    print(config)
+
+    # get classifier
+    # can be cosine or linear
     classifier =  BertClassifier(config, cos=args.cos)
+
+    # get bert(pretrained)
     model = BertModel.from_pretrained(args.model_name_or_path, config=config)
 
     model.cuda(args.cuda)
     classifier.cuda(args.cuda)
+
+    # get paths for model weights store/load
     args.checkpoint_dir = '%s/%s/%s_train' %(SAVE_DIR, args.dataset, args.config_name)
     if args.mixup:
         args.checkpoint_dir += 'mixup_%.2f'%(args.alpha)
+    if args.cos:
+        args.checkpoint_dir += 'cos'
+    if args.mix_inp:
+        args.checkpoint_dir += 'mix_inp'
 
     print('checkpoints dir : ',args.checkpoint_dir)
     if not os.path.isdir(args.checkpoint_dir):
@@ -171,6 +197,7 @@ if __name__ == '__main__':
     args.start_epoch = 0
 
     if args.resume:
+        # for testing, one has to load models from certain path
         if args.iter !=-1:
             resume_file = get_assigned_file(args.checkpoint_dir, args.iter)
         else:

@@ -9,6 +9,7 @@ from torch.nn.utils.weight_norm import WeightNorm
 
 SAVE_DIR = osp.join(osp.dirname(osp.dirname(os.getcwd())), 'data-mining')
 
+# parser
 def parse_args():
     parser = argparse.ArgumentParser(description= 'ATCNN')
     parser.add_argument("--dataset", default="nyt", type=str,
@@ -56,6 +57,7 @@ def parse_args():
     parser.add_argument('--cuda', type=int, help='gpu number')
     parser.add_argument('--cos', action='store_true', 
                         help='cosine classifier')
+    parser.add_argument('--k', type=int, help='k for prec and recall')
 
     
     return parser.parse_args()
