@@ -16,7 +16,7 @@ class NYT(Dataset):
 
         with open(self.split_json, 'rb') as f:
             self.nyt_dataset = json.load(f)
-            # print(self.nyt_dataset)
+
         with open(os.path.join(root, 'relation2id.json'), 'rb') as f:
             self.labels = json.load(f)
 
